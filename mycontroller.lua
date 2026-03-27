@@ -1,53 +1,51 @@
---costanti per il controllo del robot
 MAX_VELOCITY = 15
-BASE_SPEED = 10
-TURN_GAIN = 8
-AVOID_GAIN = 13
---funzione per limitare un valore tra un minimo e un massimo
-function clamp(v, min_v, max_v)
-    if v < min_v then
-        return min_v
-    elseif v > max_v then
-        return max_v
-    end
-    return v
-end
---funzione per sommare i vettori dei sensori (luce o prossimità) e ottenere una direzione risultante
-function sum_vector(readings)
-    local x, y = 0, 0
-    for i = 1, #readings do
-        local r = readings[i]
-        x = x + r.value * math.cos(r.angle)
-        y = y + r.value * math.sin(r.angle)
-    end
-    return x, y
-end
+FORWARD = 10
+TURN = 6
+SLOW = 2
 
 function init()
     robot.leds.set_all_colors("green")
 end
 
 function step()
-    local lx, ly = sum_vector(robot.light)
-    local px, py = sum_vector(robot.proximity)
-    local avoid = math.sqrt(px * px + py * py)
+    local left, right = FORWARD, FORWARD
 
-    if avoid > 0.1 then
-        robot.leds.set_all_colors("red")
-    else
-        robot.leds.set_all_colors("green")
+    local prox_left = 0
+    local prox_right = 0
+    local light_left = 0
+    local light_right = 0
+
+    for i = 1, 3 do
+        prox_left = prox_left + robot.proximity[i].value
+        light_left = light_left + robot.light[i].value
     end
 
-    -- Attrazione verso la luce + repulsione dagli ostacoli
-    local tx = lx - 1.8 * px
-    local ty = ly - 1.8 * py
-    local angle = math.atan2(ty, tx)
-    -- Normalizza l'angolo e calcola la velocità di rotazione e di avanzamento(in avanti).
-    local turn = clamp(angle / (math.pi / 2), -1, 1)
-    local forward = clamp(BASE_SPEED - AVOID_GAIN * avoid, 3, BASE_SPEED)
-    --setto le velocità delle ruote in base alla direzione e alla velocità desiderata
-    local left = clamp(forward - TURN_GAIN * turn, -MAX_VELOCITY, MAX_VELOCITY)
-    local right = clamp(forward + TURN_GAIN * turn, -MAX_VELOCITY, MAX_VELOCITY)
+    for i = 22, 24 do
+        prox_right = prox_right + robot.proximity[i].value
+        light_right = light_right + robot.light[i].value
+    end
+
+    -- ostacolo molto vicino: evita
+    if prox_left + prox_right > 0.15 then
+        if prox_left > prox_right then
+            left, right = FORWARD, SLOW
+        else
+            left, right = SLOW, FORWARD
+        end
+
+    -- vicino alla luce: fermati
+    elseif light_left + light_right > 2.5 then
+        left, right = 0, 0
+
+    -- appena vede più luce a sinistra, gira a sinistra
+    elseif light_left > light_right + 0.01 then
+        left, right = TURN, FORWARD
+
+    -- appena vede più luce a destra, gira a destra
+    elseif light_right > light_left + 0.01 then
+        left, right = FORWARD, TURN
+    end
+
     robot.wheels.set_velocity(left, right)
 end
 
