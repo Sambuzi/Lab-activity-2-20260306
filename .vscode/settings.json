@@ -1,0 +1,9 @@
+{
+    "Lua.diagnostics.globals": [
+        "step",
+        "init",
+        "robot",
+        "destroy",
+        "reset"
+    ]
+}
